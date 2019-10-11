@@ -1,119 +1,46 @@
-# Internet VPC
-resource "aws_vpc" "main" {
-    cidr_block = "10.0.0.0/16"
-    instance_tenancy = "default"
-    enable_dns_support = "true"
-    enable_dns_hostnames = "true"
-    enable_classiclink = "false"
-    tags {
-        Name = "main"
-    }
+
+
+provider "aws" {
+  region = "${var.region}"
 }
 
+resource "aws_vpc" "prime" {
+  cidr_block = "${var.vpc_cidr}"
+  instance_tenancy = "default"
 
-# Subnets
-resource "aws_subnet" "main-public-1" {
-    vpc_id = "${aws_vpc.main.id}"
-    cidr_block = "10.0.1.0/24"
-    map_public_ip_on_launch = "true"
-    availability_zone = "eu-west-2a"
-
-    tags {
-        Name = "main-public-1"
-    }
-}
-resource "aws_subnet" "main-public-2" {
-    vpc_id = "${aws_vpc.main.id}"
-    cidr_block = "10.0.2.0/24"
-    map_public_ip_on_launch = "true"
-    availability_zone = "eu-west-2b"
-
-    tags {
-        Name = "main-public-2"
-    }
-}
-resource "aws_subnet" "main-public-3" {
-    vpc_id = "${aws_vpc.main.id}"
-    cidr_block = "10.0.3.0/24"
-    map_public_ip_on_launch = "true"
-    availability_zone = "eu-west-2c"
-
-    tags {
-        Name = "main-public-3"
-    }
-}
-resource "aws_subnet" "main-private-1" {
-    vpc_id = "${aws_vpc.main.id}"
-    cidr_block = "10.0.4.0/24"
-    map_public_ip_on_launch = "false"
-    availability_zone = "eu-west-2a"
-
-    tags {
-        Name = "main-private-1"
-    }
-}
-resource "aws_subnet" "main-private-2" {
-    vpc_id = "${aws_vpc.main.id}"
-    cidr_block = "10.0.5.0/24"
-    map_public_ip_on_launch = "false"
-    availability_zone = "eu-west-2b"
-
-    tags {
-        Name = "main-private-2"
-    }
-}
-resource "aws_subnet" "main-private-3" {
-    vpc_id = "${aws_vpc.main.id}"
-    cidr_block = "10.0.6.0/24"
-    map_public_ip_on_launch = "false"
-    availability_zone = "eu-west-2c"
-
-    tags {
-        Name = "main-private-3"
-    }
+  tags {
+    Name = "prime"
+    Location = "London"
+  }
 }
 
-# Internet GW
-resource "aws_internet_gateway" "main-gw" {
-    vpc_id = "${aws_vpc.main.id}"
+resource "aws_subnet" "subnets" {
+  count = "${length(data.aws_availability_zones.azs.names)}"
+  availability_zone = "${element(data.aws_availability_zones.azs.names,count.index)}"
+  cidr_block = "${element(var.subnet_cidr,count.index)}"
+  vpc_id = "${aws_vpc.prime.id}"
 
-    tags {
-        Name = "main"
-    }
+  tags {
+     Name = "subnet-${count.index+1}"
+  }
 }
 
-# route tables
-resource "aws_route_table" "main-public" {
-    vpc_id = "${aws_vpc.main.id}"
-    route {
-        cidr_block = "0.0.0.0/0"
-        gateway_id = "${aws_internet_gateway.main-gw.id}"
-    }
+resource "aws_security_group" "allow_all" {
+  name        = "allow_all"
+  description = "Allow all traffic"
+  vpc_id      = "${aws_vpc.prime.id}"
 
-    tags {
-        Name = "main-public-1"
-    }
-}
+  ingress {
+    from_port   = 0
+    to_port     = 0 
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
-# route associations public
-resource "aws_route_table_association" "main-public-1-a" {
-    subnet_id = "${aws_subnet.main-public-1.id}"
-    route_table_id = "${aws_route_table.main-public.id}"
+  egress {
+    from_port       = 0
+    to_port         = 0
+    protocol        = "tcp"
+    cidr_blocks     = ["0.0.0.0/0"]
+  }
 }
-resource "aws_route_table_association" "main-public-2-a" {
-    subnet_id = "${aws_subnet.main-public-2.id}"
-    route_table_id = "${aws_route_table.main-public.id}"
-}
-resource "aws_route_table_association" "main-public-3-a" {
-    subnet_id = "${aws_subnet.main-public-3.id}"
-    route_table_id = "${aws_route_table.main-public.id}"
-}
-resource "aws_route53_record" "server1-record" {
-   zone_id = "Z3A7Y3L94GVKZY"
-   name = "server1.stevensingh.net"
-   type = "A"
-   ttl = "60"
-   records = ["${aws_instance.example.public_ip}"]
-}
-
-
